@@ -29,3 +29,18 @@ test("host path allowlist rejects paths outside configured roots", () => {
 
   assert.throws(() => assertHostPathAllowed(outside), PolicyError);
 });
+
+test("host path allowlist accepts paths under a root configured through a symlink", () => {
+  const realRoot = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "microsandbox-mcp-policy-")));
+  const linkParent = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "microsandbox-mcp-link-")));
+  const linkedRoot = path.join(linkParent, "root");
+  fs.symlinkSync(realRoot, linkedRoot);
+  fs.writeFileSync(path.join(realRoot, "child.txt"), "ok");
+
+  process.env.MICROSANDBOX_MCP_HOST_PATHS = linkedRoot;
+  process.env.MICROSANDBOX_MCP_HOST_PATH_POLICY = "allowlist";
+  resetServerConfigForTests();
+
+  assert.equal(assertHostPathAllowed(path.join(linkedRoot, "child.txt")), path.join(realRoot, "child.txt"));
+  assert.equal(assertHostPathAllowed(path.join(linkedRoot, "new.txt")), path.join(realRoot, "new.txt"));
+});

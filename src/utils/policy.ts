@@ -20,7 +20,11 @@ export function assertHostPathAllowed(rawPath: string): string {
     return resolved;
   }
 
-  const allowed = config.hostPaths.some((allowedPath) => isWithinPath(resolved, allowedPath));
+  // Resolve the roots the same way as the candidate, or a root configured
+  // through a symlink (such as /tmp on macOS) would reject everything under it.
+  const allowed = config.hostPaths.some((allowedPath) =>
+    isWithinPath(resolved, resolveExistingAware(allowedPath)),
+  );
   if (!allowed) {
     throw new PolicyError("host path is outside MICROSANDBOX_MCP_HOST_PATHS", resolved);
   }
