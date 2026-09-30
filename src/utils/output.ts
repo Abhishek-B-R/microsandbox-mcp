@@ -17,7 +17,15 @@ export function limitText(value: string, field: string, maxBytes = getServerConf
     return { text: value };
   }
 
-  const limited = Buffer.from(value, "utf8").subarray(0, maxBytes).toString("utf8");
+  const bytes = Buffer.from(value, "utf8");
+  let end = maxBytes;
+  // Back up to a character boundary so a multi-byte character is not cut in
+  // half and decoded as a replacement character.
+  while (end > 0 && (bytes[end] & 0xc0) === 0x80) {
+    end -= 1;
+  }
+
+  const limited = bytes.subarray(0, end).toString("utf8");
   return {
     text: limited,
     truncated: {
