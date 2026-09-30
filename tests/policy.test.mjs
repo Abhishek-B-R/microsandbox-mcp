@@ -29,3 +29,32 @@ test("host path allowlist rejects paths outside configured roots", () => {
 
   assert.throws(() => assertHostPathAllowed(outside), PolicyError);
 });
+
+test("host path allowlist rejects new paths reached through a symlink out of the root", () => {
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "microsandbox-mcp-policy-")));
+  const outside = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "microsandbox-mcp-outside-")));
+  fs.symlinkSync(outside, path.join(root, "escape"));
+  fs.symlinkSync(path.join(outside, "planted.txt"), path.join(root, "dangling"));
+  fs.mkdirSync(path.join(outside, "deep"));
+  fs.symlinkSync(path.join(outside, "deep"), path.join(root, "deep"));
+  fs.symlinkSync("../relative.txt", path.join(outside, "deep", "relative"));
+
+  process.env.MICROSANDBOX_MCP_HOST_PATHS = root;
+  process.env.MICROSANDBOX_MCP_HOST_PATH_POLICY = "allowlist";
+  resetServerConfigForTests();
+
+  assert.throws(() => assertHostPathAllowed(path.join(root, "escape", "new-dir", "file.txt")), PolicyError);
+  assert.throws(() => assertHostPathAllowed(path.join(root, "dangling")), PolicyError);
+  assert.throws(() => assertHostPathAllowed(path.join(root, "deep", "relative")), PolicyError);
+});
+
+test("host path allowlist accepts new nested paths under the root", () => {
+  const root = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), "microsandbox-mcp-policy-")));
+
+  process.env.MICROSANDBOX_MCP_HOST_PATHS = root;
+  process.env.MICROSANDBOX_MCP_HOST_PATH_POLICY = "allowlist";
+  resetServerConfigForTests();
+
+  const nested = path.join(root, "new-dir", "deeper", "file.txt");
+  assert.equal(assertHostPathAllowed(nested), nested);
+});
